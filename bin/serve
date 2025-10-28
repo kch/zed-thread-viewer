@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec bundle exec puma -p 9292 -t 8:32

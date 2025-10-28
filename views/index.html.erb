@@ -127,6 +127,7 @@
 
   <script>
     let allTitles = [];
+    let currentSelectedId = null;
 
     async function loadTitles() {
       const response = await fetch('/titles');
@@ -171,6 +172,8 @@
     function displayTitles(titles) {
       const table = document.querySelector('#titles');
       const existingRows = table.querySelectorAll('.grid-row');
+      const selectedId = getSelectedId();
+
       existingRows.forEach(row => row.remove());
 
       titles.forEach((item, index) => {
@@ -190,6 +193,18 @@
         `;
         table.appendChild(row);
       });
+
+      // Restore selection if item still exists
+      const idToRestore = selectedId || currentSelectedId;
+      if (idToRestore) {
+        const rows = table.querySelectorAll('.grid-row');
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i].dataset.id === idToRestore) {
+            selectRow(i);
+            return;
+          }
+        }
+      }
     }
 
     function selectRow(index) {
@@ -204,6 +219,10 @@
 
         // Save selection position
         localStorage.setItem('selectedRowIndex', index);
+
+        // Update global selected ID
+        const selectedRow = table.querySelectorAll('.grid-row')[index];
+        currentSelectedId = selectedRow ? selectedRow.dataset.id : null;
       }
     }
 
@@ -213,6 +232,11 @@
     }
 
     async function searchTitles() {
+      // Store current selection before search
+      if (!currentSelectedId) {
+        currentSelectedId = getSelectedId();
+      }
+
       const query = document.getElementById('search').value.trim();
       if (query.length === 0) {
         displayTitles(allTitles);
@@ -248,6 +272,7 @@
 
       if (index === -1 && e.key === 'ArrowDown') newIndex = 0;
 
+      currentSelectedId = rows[newIndex] ? rows[newIndex].dataset.id : null;
       selectRow(newIndex);
       loadContent();
     });
@@ -268,6 +293,7 @@
       const row = e.target.closest('.grid-row');
       if (row && row.dataset.row !== undefined) {
         isDragging = true;
+        currentSelectedId = row.dataset.id;
         selectRow(parseInt(row.dataset.row));
         loadContent();
       }
@@ -277,6 +303,7 @@
       if (!isDragging) return;
       const row = e.target.closest('.grid-row');
       if (row && row.dataset.row !== undefined) {
+        currentSelectedId = row.dataset.id;
         selectRow(parseInt(row.dataset.row));
         loadContent();
       }

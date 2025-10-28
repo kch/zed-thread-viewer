@@ -9,7 +9,7 @@ gem "sqlite3"
 gem "zstd-ruby"
 gem "kramdown"
 gem "kramdown-parser-gfm"
-gem "neatjson"
+gem "loofah"
 
 # Optional for development
 group :development do

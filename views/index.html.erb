@@ -20,18 +20,83 @@
     .table-container { border: 1px solid transparent; outline: 0; box-sizing: border-box; flex: 1; min-height: 0; overflow-y: auto; }
     .table-container:focus-within { border-color: #FFCC66; }
 
-    .titles-table { overflow-y: auto; background: #1C212B; outline: none; width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .titles-table td { font-size: 10px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background: transparent; color: #CCCAC2; border: none; padding: 2px 4px; cursor: pointer; }
-    .titles-table tr { background: #1C212B; }
-    .titles-table tbody tr.selected { background: #D4A574 !important; }
-    .titles-table tbody tr.selected td { color: #1F2430 !important; }
-    .titles-table tbody tr:hover:not(.selected) { background: #2A2F3A; }
-    .titles-table th { font-size: 10px; padding: 2px 4px; background: #242936; color: #CCCAC2; border: none; text-align: left; }
+    .titles-table {
+      display: grid;
+      grid-template-columns: max-content max-content 1fr max-content;
+      background: #1C212B;
+      outline: none;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    .titles-table .grid-header,
+    .titles-table .grid-cell {
+      font-size: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-variant-numeric: tabular-nums;
+      background: transparent;
+      color: #CCCAC2;
+      border: none;
+      padding: 2px 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      -webkit-user-drag: none;
+      -khtml-user-drag: none;
+      -moz-user-drag: none;
+      -o-user-drag: none;
+      user-drag: none;
+      pointer-events: auto;
+    }
+    .titles-table .grid-row {
+      display: grid;
+      grid-column: 1 / -1;
+      grid-template-columns: subgrid;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+    }
+    .titles-table .grid-row:hover .grid-cell:not(.selected-cell) {
+      background: #2A2F3A;
+    }
+    .titles-table .grid-row.selected .grid-cell {
+      background: #D4A574 !important;
+      color: #1F2430 !important;
+    }
+    .titles-table .grid-header {
+      font-size: 10px;
+      padding: 2px 4px;
+      background: #242936;
+      color: #CCCAC2;
+      border: none;
+      text-align: left;
+    }
 
-    .titles-table .col-symbol { width: 4%; text-align: center; font-weight: bold; }
-    .titles-table .col-date { width: 18%; font-size: 9px; color: #707A8C; }
-    .titles-table .col-title { width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .titles-table .col-project { width: 20%; font-size: 9px; color: #707A8C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .titles-table .col-symbol {
+      max-width: 1em;
+      text-align: center;
+      font-weight: bold;
+    }
+    .titles-table .col-date {
+      max-width: 9em;
+      font-size: 9px;
+      color: #707A8C;
+    }
+    .titles-table .col-project {
+      max-width: 10em;
+      font-size: 9px;
+      color: #707A8C;
+    }
 
     .content { height: 100%; }
     .content iframe { width: 100%; height: 100%; border: none; }
@@ -44,25 +109,13 @@
     <div class="titles-section">
       <input type="text" id="search" placeholder="Search..." oninput="searchTitles()">
       <div class="table-container" tabindex="0">
-        <table class="titles-table" id="titles">
-          <colgroup>
-            <col class="col-symbol">
-            <col class="col-date">
-            <col class="col-title">
-            <col class="col-project">
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="col-symbol"></th>
-              <th class="col-date">Date</th>
-              <th class="col-title">Title</th>
-              <th class="col-project">Project</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Rows loaded via JavaScript -->
-          </tbody>
-        </table>
+        <div class="titles-table" id="titles">
+          <div class="grid-header col-symbol"></div>
+          <div class="grid-header col-date">Date</div>
+          <div class="grid-header col-title">Title</div>
+          <div class="grid-header col-project">Project</div>
+          <!-- Rows loaded via JavaScript -->
+        </div>
       </div>
     </div>
     <div class="content-section">
@@ -85,9 +138,10 @@
       const savedSelection = localStorage.getItem('selectedEntryId');
       let selectionRestored = false;
 
-      if (savedSelection && table.rows.length > 0) {
-        for (let i = 0; i < table.rows.length; i++) {
-          if (table.rows[i].dataset.id === savedSelection) {
+      const rows = table.querySelectorAll('.grid-row');
+      if (savedSelection && rows.length > 0) {
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i].dataset.id === savedSelection) {
             selectRow(i);
             selectionRestored = true;
             break;
@@ -98,44 +152,55 @@
       // If no ID match, try restoring by row index
       if (!selectionRestored) {
         const savedIndex = localStorage.getItem('selectedRowIndex');
-        if (savedIndex && table.rows[parseInt(savedIndex)]) {
+        const rows = table.querySelectorAll('.grid-row');
+        if (savedIndex && rows[parseInt(savedIndex)]) {
           selectRow(parseInt(savedIndex));
           selectionRestored = true;
         }
       }
 
-      if (!selectionRestored && table.rows.length > 0) {
+      if (!selectionRestored && rows.length > 0) {
         selectRow(0);
       }
 
-      if (table.rows.length > 0) {
+      if (rows.length > 0) {
         loadContent();
       }
     }
 
     function displayTitles(titles) {
-      const tbody = document.querySelector('#titles tbody');
-      tbody.innerHTML = titles.map((item, index) => {
+      const table = document.querySelector('#titles');
+      const existingRows = table.querySelectorAll('.grid-row');
+      existingRows.forEach(row => row.remove());
+
+      titles.forEach((item, index) => {
         const symbol = item.symbol || '';
-        const date = item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) : '';
+        const date = item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '';
         const workspace = item.workspace || '';
-        return `<tr data-row="${index}" data-id="${item.id}" class="type-${item.type}">
-          <td class="col-symbol">${symbol}</td>
-          <td class="col-date">${date}</td>
-          <td class="col-title">${item.title}</td>
-          <td class="col-project">${workspace}</td>
-        </tr>`;
-      }).join('');
+
+        const row = document.createElement('div');
+        row.className = `grid-row type-${item.type}`;
+        row.dataset.row = index;
+        row.dataset.id = item.id;
+        row.innerHTML = `
+          <div class="grid-cell col-symbol">${symbol}</div>
+          <div class="grid-cell col-date">${date}</div>
+          <div class="grid-cell col-title">${item.title}</div>
+          <div class="grid-cell col-project">${workspace}</div>
+        `;
+        table.appendChild(row);
+      });
     }
 
     function selectRow(index) {
-      const tbody = document.querySelector('#titles tbody');
-      const current = tbody.querySelector('tr.selected');
+      const table = document.querySelector('#titles');
+      const current = table.querySelector('.grid-row.selected');
       current?.classList.remove('selected');
 
-      if (tbody.rows[index]) {
-        tbody.rows[index].classList.add('selected');
-        tbody.rows[index].scrollIntoView({ block: 'nearest' });
+      const rows = table.querySelectorAll('.grid-row');
+      if (rows[index]) {
+        rows[index].classList.add('selected');
+        rows[index].scrollIntoView({ block: 'nearest' });
 
         // Save selection position
         localStorage.setItem('selectedRowIndex', index);
@@ -143,7 +208,7 @@
     }
 
     function getSelectedId() {
-      const selected = document.querySelector('#titles tr.selected');
+      const selected = document.querySelector('#titles .grid-row.selected');
       return selected?.dataset.id;
     }
 
@@ -172,9 +237,9 @@
       if (!['ArrowUp', 'ArrowDown'].includes(e.key)) return;
 
       e.preventDefault();
-      const table = e.target;
-      const rows = Array.from(table.querySelectorAll('tbody tr'));
-      const current = table.querySelector('tr.selected');
+      const table = document.querySelector('#titles');
+      const rows = Array.from(table.querySelectorAll('.grid-row'));
+      const current = table.querySelector('.grid-row.selected');
       const index = current ? parseInt(current.dataset.row) : -1;
 
       let newIndex = e.key === 'ArrowDown'
@@ -189,20 +254,36 @@
 
     // Auto-select first row when table container receives focus
     document.querySelector('.table-container').addEventListener('focus', (e) => {
-      const selected = document.querySelector('#titles tbody tr.selected');
-      const tbody = document.querySelector('#titles tbody');
-      if (!selected && tbody.rows.length > 0) {
+      const selected = document.querySelector('#titles .grid-row.selected');
+      const table = document.querySelector('#titles');
+      if (!selected && table.querySelectorAll('.grid-row').length > 0) {
         selectRow(0);
       }
     });
 
-    // Click to select rows
-    document.getElementById('titles').addEventListener('click', (e) => {
-      const row = e.target.closest('tr');
+    // Mouse selection handling
+    let isDragging = false;
+
+    document.getElementById('titles').addEventListener('mousedown', (e) => {
+      const row = e.target.closest('.grid-row');
+      if (row && row.dataset.row !== undefined) {
+        isDragging = true;
+        selectRow(parseInt(row.dataset.row));
+        loadContent();
+      }
+    });
+
+    document.getElementById('titles').addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const row = e.target.closest('.grid-row');
       if (row && row.dataset.row !== undefined) {
         selectRow(parseInt(row.dataset.row));
         loadContent();
       }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
     });
 
     // Global keyboard handler for '/' key and input arrow keys

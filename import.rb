@@ -7,66 +7,120 @@ require "digest"
 require "fileutils"
 
 class ZedImporter
-  def initialize(datasources_path = "./datasources", output_db = "./datasources/unified.db")
+  def initialize(datasources_path = "./datasources", output_db = "./datasources/unified.db", full_import = false)
     @datasources_path = datasources_path
     @output_db        = output_db
     @conversations_path = File.join(@datasources_path, "conversations")
     @threads_path      = File.join(@datasources_path, "threads")
+    @full_import = full_import
+
+    # Check for schema changes and force full import if needed
+    @full_import = true if needs_schema_migration?
 
     setup_database
   end
 
   def setup_database
-    File.delete(@output_db) if File.exist?(@output_db)
+    if @full_import
+      File.delete(@output_db) if File.exist?(@output_db)
+    end
 
     @db = SQLite3::Database.new(@output_db)
-    @db.execute <<~SQL
-      CREATE TABLE entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        full_json TEXT NOT NULL,
-        file_path TEXT,
-        workspace_path TEXT,
-        original_id TEXT,
-        timestamp TEXT,
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    SQL
 
-    @db.execute "CREATE INDEX idx_type ON entries(type)"
-    @db.execute "CREATE INDEX idx_title ON entries(title)"
+    # Create tables if they don't exist
+    unless table_exists?("entries")
+      @db.execute <<~SQL
+        CREATE TABLE entries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          content TEXT NOT NULL,
+          full_json TEXT NOT NULL,
+          file_path TEXT,
+          workspace_path TEXT,
+          project TEXT,
+          original_id TEXT,
+          timestamp TEXT,
+          file_mtime TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      SQL
 
-    # Create FTS5 search index
-    @db.execute <<~SQL
-      CREATE VIRTUAL TABLE entries_fts USING fts5(
-        title,
-        content,
-        content=entries,
-        content_rowid=id
-      )
-    SQL
+      @db.execute "CREATE INDEX idx_type ON entries(type)"
+      @db.execute "CREATE INDEX idx_title ON entries(title)"
+      @db.execute "CREATE INDEX idx_file_path ON entries(file_path)"
+      @db.execute "CREATE INDEX idx_original_id ON entries(original_id)"
+      @db.execute "CREATE INDEX idx_project ON entries(project)"
+    end
 
-    # Trigger to keep FTS in sync
-    @db.execute <<~SQL
-      CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
-        INSERT INTO entries_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
-      END
-    SQL
+    # Add columns if they don't exist (migrations)
+    unless column_exists?("entries", "file_mtime")
+      @db.execute "ALTER TABLE entries ADD COLUMN file_mtime TEXT"
+    end
+    unless column_exists?("entries", "project")
+      @db.execute "ALTER TABLE entries ADD COLUMN project TEXT"
+      @db.execute "CREATE INDEX idx_project ON entries(project)"
+    end
 
-    @db.execute <<~SQL
-      CREATE TRIGGER entries_ad AFTER DELETE ON entries BEGIN
-        INSERT INTO entries_fts(entries_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
-      END
-    SQL
+    # Create FTS5 search index if it doesn't exist
+    unless table_exists?("entries_fts")
+      @db.execute <<~SQL
+        CREATE VIRTUAL TABLE entries_fts USING fts5(
+          title,
+          content,
+          project,
+          content=entries,
+          content_rowid=id
+        )
+      SQL
 
-    @db.execute <<~SQL
-      CREATE TRIGGER entries_au AFTER UPDATE ON entries BEGIN
-        INSERT INTO entries_fts(entries_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
-        INSERT INTO entries_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
-      END
-    SQL
+      # Trigger to keep FTS in sync
+      @db.execute <<~SQL
+        CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
+          INSERT INTO entries_fts(rowid, title, content, project) VALUES (new.id, new.title, new.content, COALESCE(new.project, ''));
+        END
+      SQL
+
+      @db.execute <<~SQL
+        CREATE TRIGGER entries_ad AFTER DELETE ON entries BEGIN
+          INSERT INTO entries_fts(entries_fts, rowid, title, content, project) VALUES('delete', old.id, old.title, old.content, COALESCE(old.project, ''));
+        END
+      SQL
+
+      @db.execute <<~SQL
+        CREATE TRIGGER entries_au AFTER UPDATE ON entries BEGIN
+          INSERT INTO entries_fts(entries_fts, rowid, title, content, project) VALUES('delete', old.id, old.title, old.content, COALESCE(old.project, ''));
+          INSERT INTO entries_fts(rowid, title, content, project) VALUES (new.id, new.title, new.content, COALESCE(new.project, ''));
+        END
+      SQL
+    end
+  end
+
+  def needs_schema_migration?
+    return false unless File.exist?(@output_db)
+
+    temp_db = SQLite3::Database.new(@output_db)
+
+    # Check if project column exists
+    has_project = begin
+      pragma_result = temp_db.execute("PRAGMA table_info(entries)")
+      pragma_result.any? { |row| row[1] == "project" }
+    rescue
+      false
+    end
+
+    temp_db.close
+    !has_project
+  end
+
+  def table_exists?(table_name)
+    result = @db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table_name])
+    !result.empty?
+  end
+
+  def column_exists?(table_name, column_name)
+    pragma_result = @db.execute("PRAGMA table_info(#{table_name})")
+    pragma_result.any? { |row| row[1] == column_name }
   end
 
   def import_conversations
@@ -76,8 +130,26 @@ class ZedImporter
     pattern = File.join(@conversations_path, "*.zed.json")
     files = Dir[pattern]
 
+    # Get existing file info for incremental updates
+    existing_files = {}
+    unless @full_import
+      @db.execute("SELECT file_path, file_mtime FROM entries WHERE type = 'conversation' AND file_path IS NOT NULL") do |row|
+        existing_files[row[0]] = row[1]
+      end
+    end
+
+    new_count = 0
+    updated_count = 0
+
     files.each do |file|
       begin
+        file_mtime = File.mtime(file).iso8601
+
+        # Skip if file hasn't changed (incremental mode)
+        if !@full_import && existing_files[file] == file_mtime
+          next
+        end
+
         content = File.read(file)
         data = JSON.parse(content)
 
@@ -85,16 +157,43 @@ class ZedImporter
         text_content = data["text"] || ""
         timestamp = File.mtime(file).iso8601
         workspace_path = extract_conversation_path(data)
+        project = workspace_path ? File.basename(workspace_path) : nil
 
-        @db.execute <<~SQL, ["conversation", title, text_content, content, file, workspace_path, nil, timestamp]
-          INSERT INTO entries (type, title, content, full_json, file_path, workspace_path, original_id, timestamp)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        SQL
-
-        puts "  #{File.basename(file)}"
+        if existing_files.key?(file)
+          # Update existing entry
+          @db.execute <<~SQL, [title, text_content, content, workspace_path, project, timestamp, file_mtime, file]
+            UPDATE entries SET title = ?, content = ?, full_json = ?, workspace_path = ?, project = ?, timestamp = ?, file_mtime = ?
+            WHERE file_path = ?
+          SQL
+          updated_count += 1
+          puts "  Updated: #{File.basename(file)}"
+        else
+          # Insert new entry
+          @db.execute <<~SQL, ["conversation", title, text_content, content, file, workspace_path, project, nil, timestamp, file_mtime]
+            INSERT INTO entries (type, title, content, full_json, file_path, workspace_path, project, original_id, timestamp, file_mtime)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          SQL
+          new_count += 1
+          puts "  Added: #{File.basename(file)}"
+        end
       rescue => e
         puts "  ERROR: #{File.basename(file)} - #{e.message}"
       end
+    end
+
+    # Remove entries for deleted files
+    unless @full_import
+      deleted_count = 0
+      existing_files.each do |file_path, _|
+        unless File.exist?(file_path)
+          @db.execute("DELETE FROM entries WHERE file_path = ?", [file_path])
+          deleted_count += 1
+          puts "  Deleted: #{File.basename(file_path)}"
+        end
+      end
+      puts "  Conversations: #{new_count} added, #{updated_count} updated, #{deleted_count} deleted"
+    else
+      puts "  Conversations: #{new_count} imported"
     end
   end
 
@@ -105,9 +204,25 @@ class ZedImporter
     puts "Importing threads..."
     threads_db = SQLite3::Database.new(threads_db_path)
 
+    # Get existing threads for incremental updates
+    existing_threads = {}
+    unless @full_import
+      @db.execute("SELECT original_id, timestamp FROM entries WHERE type = 'thread' AND original_id IS NOT NULL") do |row|
+        existing_threads[row[0]] = row[1]
+      end
+    end
+
+    new_count = 0
+    updated_count = 0
+
     threads_db.execute("SELECT id, summary, data, updated_at FROM threads") do |row|
       begin
         thread_id, summary, compressed_data, updated_at = row
+
+        # Skip if thread hasn't changed (incremental mode)
+        if !@full_import && existing_threads[thread_id] == updated_at
+          next
+        end
 
         # Decompress the data
         json_data = Zstd.decompress(compressed_data)
@@ -116,19 +231,51 @@ class ZedImporter
         title = extract_thread_title(thread_data, summary)
         content = extract_thread_content(thread_data)
         workspace_path = extract_workspace_path(thread_data)
+        project = workspace_path ? File.basename(workspace_path) : nil
 
-        @db.execute <<~SQL, ["thread", title, content, json_data, nil, workspace_path, thread_id, updated_at]
-          INSERT INTO entries (type, title, content, full_json, file_path, workspace_path, original_id, timestamp)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        SQL
-
-        puts "  #{title}"
+        if existing_threads.key?(thread_id)
+          # Update existing entry
+          @db.execute <<~SQL, [title, content, json_data, workspace_path, project, updated_at, thread_id]
+            UPDATE entries SET title = ?, content = ?, full_json = ?, workspace_path = ?, project = ?, timestamp = ?
+            WHERE original_id = ?
+          SQL
+          updated_count += 1
+          puts "  Updated: #{title}"
+        else
+          # Insert new entry
+          @db.execute <<~SQL, ["thread", title, content, json_data, nil, workspace_path, project, thread_id, updated_at]
+            INSERT INTO entries (type, title, content, full_json, file_path, workspace_path, project, original_id, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          SQL
+          new_count += 1
+          puts "  Added: #{title}"
+        end
       rescue => e
         puts "  ERROR: Thread #{thread_id} - #{e.message}"
       end
     end
 
     threads_db.close
+
+    # Remove entries for deleted threads
+    unless @full_import
+      deleted_count = 0
+      existing_thread_ids = Set.new
+      threads_db = SQLite3::Database.new(threads_db_path)
+      threads_db.execute("SELECT id FROM threads") { |row| existing_thread_ids.add(row[0]) }
+      threads_db.close
+
+      existing_threads.each do |thread_id, _|
+        unless existing_thread_ids.include?(thread_id)
+          @db.execute("DELETE FROM entries WHERE original_id = ?", [thread_id])
+          deleted_count += 1
+          puts "  Deleted: Thread #{thread_id}"
+        end
+      end
+      puts "  Threads: #{new_count} added, #{updated_count} updated, #{deleted_count} deleted"
+    else
+      puts "  Threads: #{new_count} imported"
+    end
   end
 
   def extract_conversation_title(data, file)
@@ -218,7 +365,7 @@ class ZedImporter
   end
 
   def run
-    puts "Starting import process..."
+    puts "Starting #{@full_import ? 'full' : 'incremental'} import process..."
     puts "Datasources: #{@datasources_path}"
     puts "Output DB: #{@output_db}"
 
@@ -233,9 +380,13 @@ class ZedImporter
     total = @db.execute("SELECT COUNT(*) FROM entries").first.first
     puts "  Total: #{total}"
 
-    # Populate FTS index
-    puts "Populating search index..."
-    @db.execute "INSERT INTO entries_fts(rowid, title, content) SELECT id, title, content FROM entries"
+    # Populate FTS index if it's a full import or if FTS is empty
+    fts_count = @db.execute("SELECT COUNT(*) FROM entries_fts").first.first
+    if @full_import || fts_count == 0
+      puts "Populating search index..."
+      @db.execute "DELETE FROM entries_fts" if fts_count > 0
+      @db.execute "INSERT INTO entries_fts(rowid, title, content, project) SELECT id, title, content, COALESCE(project, '') FROM entries"
+    end
 
     @db.close
   end
@@ -243,9 +394,27 @@ end
 
 # Run if called directly
 if __FILE__ == $0
+  require 'optparse'
+  require 'set'
+
+  options = {}
+  OptionParser.new do |opts|
+    opts.banner = "Usage: import.rb [options] [datasources_path] [output_db]"
+
+    opts.on("--full", "Perform full import (delete and recreate database)") do |v|
+      options[:full] = v
+    end
+
+    opts.on("-h", "--help", "Prints this help") do
+      puts opts
+      exit
+    end
+  end.parse!
+
   datasources = ARGV[0] || "./datasources"
   output_db = ARGV[1] || "./datasources/unified.db"
+  full_import = options[:full] || false
 
-  importer = ZedImporter.new(datasources, output_db)
+  importer = ZedImporter.new(datasources, output_db, full_import)
   importer.run
 end

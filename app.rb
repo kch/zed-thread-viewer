@@ -2,6 +2,7 @@ require "roda"
 require "sqlite3"
 require "json"
 require "erb"
+require "digest"
 
 class ConversationViewer < Roda
   plugin :render, engine: "erb", layout: false, views: "views", allowed_paths: %w[views]
@@ -24,21 +25,20 @@ class ConversationViewer < Roda
 
     r.get "titles" do
       rows = self.class.db.execute(<<~SQL)
-        SELECT id, title, type, workspace_path, timestamp
+        SELECT id, title, type, project, timestamp
         FROM entries
         ORDER BY timestamp DESC
       SQL
 
-      rows.map do |id, title, type, workspace_path, timestamp|
+      rows.map do |id, title, type, project, timestamp|
         symbol = type == "thread" ? "𝐀" : "𝐓"
-        workspace = workspace_path ? File.basename(workspace_path) : ""
         created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
         {
           id: id,
           title: title,
           type: type,
           symbol: symbol,
-          workspace: workspace,
+          workspace: project || "",
           created_at: created_at
         }
       end
@@ -48,24 +48,23 @@ class ConversationViewer < Roda
       query = r.params["q"].to_s.strip
       return [] if query.empty?
 
-      rows = self.class.db.execute(<<~SQL, [query])
-        SELECT e.id, e.title, e.type, e.workspace_path, e.timestamp
+      rows = self.class.db.execute(<<~SQL, ["#{query}*"])
+        SELECT e.id, e.title, e.type, e.project, e.timestamp
         FROM entries e
         JOIN entries_fts ON entries_fts.rowid = e.id
         WHERE entries_fts MATCH ?
         ORDER BY e.timestamp DESC
       SQL
 
-      rows.map do |id, title, type, workspace_path, timestamp|
+      rows.map do |id, title, type, project, timestamp|
         symbol = type == "thread" ? "𝐀" : "𝐓"
-        workspace = workspace_path ? File.basename(workspace_path) : ""
         created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
         {
           id: id,
           title: title,
           type: type,
           symbol: symbol,
-          workspace: workspace,
+          workspace: project || "",
           created_at: created_at
         }
       end
@@ -87,6 +86,8 @@ class ConversationViewer < Roda
       title, content, type, full_json = row
 
       response["Content-Type"] = "text/html; charset=utf-8"
+      response["Cache-Control"] = "max-age=3600, public"
+      response["ETag"] = "\"#{id}-#{Digest::MD5.hexdigest(content + view)}\""
 
       if view == "json"
         require 'cgi'

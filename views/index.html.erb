@@ -5,20 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zed Thread Viewer</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+    html, body { margin: 0; padding: 0; overflow: hidden; }
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; height: 100vh; background: #1F2430; color: #CCCAC2; }
-    .container { display: flex; flex-direction: row; height: 100vh; }
-    .titles-section { width: 33vw; border-right: 2px solid #242936; background: #1F2430; }
+
+    .container { display: flex; flex-direction: row; height: 100vh; max-height: 100vh; overflow: hidden; }
+    .titles-section { width: 33vw; border-right: 2px solid #242936; background: #1F2430; display: flex; flex-direction: column; }
     .content-section { width: 67vw; }
-    .titles { height: calc(100vh - 36px); overflow-y: auto; border: 1px solid #242936; background: #1C212B; }
+
+    input { width: 100%; font-size: 10px; padding: 4px; border: 1px solid #242936; background: #1C212B; color: #CCCAC2; outline: 0; }
+    input::placeholder { color: #707A8C; }
+    input:focus { outline: 0; border-color: #FFCC66; }
+
+    .table-container { border: 1px solid transparent; outline: 0; box-sizing: border-box; flex: 1; min-height: 0; overflow-y: auto; }
+    .table-container:focus-within { border-color: #FFCC66; }
+
+    .titles-table { overflow-y: auto; background: #1C212B; outline: none; width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .titles-table td { font-size: 10px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background: transparent; color: #CCCAC2; border: none; padding: 2px 4px; cursor: pointer; }
+    .titles-table tr { background: #1C212B; }
+    .titles-table tbody tr.selected { background: #D4A574 !important; }
+    .titles-table tbody tr.selected td { color: #1F2430 !important; }
+    .titles-table tbody tr:hover:not(.selected) { background: #2A2F3A; }
+    .titles-table th { font-size: 10px; padding: 2px 4px; background: #242936; color: #CCCAC2; border: none; text-align: left; }
+
+    .titles-table .col-symbol { width: 4%; text-align: center; font-weight: bold; }
+    .titles-table .col-date { width: 18%; font-size: 9px; color: #707A8C; }
+    .titles-table .col-title { width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .titles-table .col-project { width: 20%; font-size: 9px; color: #707A8C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .content { height: 100%; }
     .content iframe { width: 100%; height: 100%; border: none; }
-    select { width: 100%; height: 100%; font-size: 10px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background: #1C212B; color: #CCCAC2; border: none; }
-    option { padding: 1px; background: #242936; color: #CCCAC2; }
-    h2 { padding: 6px; margin: 0; font-size: 12px; background: #242936; color: #CCCAC2; border-bottom: 1px solid #1A1F29; }
-    input { width: 100%; font-size: 10px; padding: 4px; margin-bottom: 4px; border: 1px solid #242936; background: #1C212B; color: #CCCAC2; }
-    input::placeholder { color: #707A8C; }
-    input:focus { outline: none; border-color: #FFCC66; }
     .type-thread { background-color: rgba(115, 208, 255, 0.15); color: #73D0FF; }
     .type-conversation { background-color: rgba(213, 255, 128, 0.15); color: #D5FF80; }
   </style>
@@ -26,11 +42,28 @@
 <body>
   <div class="container">
     <div class="titles-section">
-
       <input type="text" id="search" placeholder="Search..." oninput="searchTitles()">
-      <select class="titles" id="titles" size="20" onchange="loadContent()">
-        <!-- Options loaded via JavaScript -->
-      </select>
+      <div class="table-container" tabindex="0">
+        <table class="titles-table" id="titles">
+          <colgroup>
+            <col class="col-symbol">
+            <col class="col-date">
+            <col class="col-title">
+            <col class="col-project">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="col-symbol"></th>
+              <th class="col-date">Date</th>
+              <th class="col-title">Title</th>
+              <th class="col-project">Project</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Rows loaded via JavaScript -->
+          </tbody>
+        </table>
+      </div>
     </div>
     <div class="content-section">
       <div class="content">
@@ -48,34 +81,70 @@
       displayTitles(allTitles);
 
       // Restore previous selection or auto-select first item
-      const select = document.getElementById('titles');
+      const table = document.getElementById('titles');
       const savedSelection = localStorage.getItem('selectedEntryId');
       let selectionRestored = false;
 
-      if (savedSelection && select.options.length > 0) {
-        for (let i = 0; i < select.options.length; i++) {
-          if (select.options[i].value === savedSelection) {
-            select.selectedIndex = i;
+      if (savedSelection && table.rows.length > 0) {
+        for (let i = 0; i < table.rows.length; i++) {
+          if (table.rows[i].dataset.id === savedSelection) {
+            selectRow(i);
             selectionRestored = true;
             break;
           }
         }
       }
 
-      if (!selectionRestored && select.options.length > 0) {
-        select.selectedIndex = 0;
+      // If no ID match, try restoring by row index
+      if (!selectionRestored) {
+        const savedIndex = localStorage.getItem('selectedRowIndex');
+        if (savedIndex && table.rows[parseInt(savedIndex)]) {
+          selectRow(parseInt(savedIndex));
+          selectionRestored = true;
+        }
       }
 
-      if (select.options.length > 0) {
+      if (!selectionRestored && table.rows.length > 0) {
+        selectRow(0);
+      }
+
+      if (table.rows.length > 0) {
         loadContent();
       }
     }
 
     function displayTitles(titles) {
-      const select = document.getElementById('titles');
-      select.innerHTML = titles.map(item =>
-        `<option value="${item.id}" class="type-${item.type}">${item.title}</option>`
-      ).join('');
+      const tbody = document.querySelector('#titles tbody');
+      tbody.innerHTML = titles.map((item, index) => {
+        const symbol = item.symbol || '';
+        const date = item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) : '';
+        const workspace = item.workspace || '';
+        return `<tr data-row="${index}" data-id="${item.id}" class="type-${item.type}">
+          <td class="col-symbol">${symbol}</td>
+          <td class="col-date">${date}</td>
+          <td class="col-title">${item.title}</td>
+          <td class="col-project">${workspace}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function selectRow(index) {
+      const tbody = document.querySelector('#titles tbody');
+      const current = tbody.querySelector('tr.selected');
+      current?.classList.remove('selected');
+
+      if (tbody.rows[index]) {
+        tbody.rows[index].classList.add('selected');
+        tbody.rows[index].scrollIntoView({ block: 'nearest' });
+
+        // Save selection position
+        localStorage.setItem('selectedRowIndex', index);
+      }
+    }
+
+    function getSelectedId() {
+      const selected = document.querySelector('#titles tr.selected');
+      return selected?.dataset.id;
     }
 
     async function searchTitles() {
@@ -91,15 +160,80 @@
     }
 
     async function loadContent() {
-      const select = document.getElementById('titles');
-      const id = select.value;
+      const id = getSelectedId();
       if (!id) return;
 
-      // Save selection to localStorage
       localStorage.setItem('selectedEntryId', id);
-
       document.getElementById('content-frame').src = `/content/${id}`;
     }
+
+    // Table keyboard navigation
+    document.querySelector('.table-container').addEventListener('keydown', (e) => {
+      if (!['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+
+      e.preventDefault();
+      const table = e.target;
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      const current = table.querySelector('tr.selected');
+      const index = current ? parseInt(current.dataset.row) : -1;
+
+      let newIndex = e.key === 'ArrowDown'
+        ? Math.min(index + 1, rows.length - 1)
+        : Math.max(index - 1, 0);
+
+      if (index === -1 && e.key === 'ArrowDown') newIndex = 0;
+
+      selectRow(newIndex);
+      loadContent();
+    });
+
+    // Auto-select first row when table container receives focus
+    document.querySelector('.table-container').addEventListener('focus', (e) => {
+      const selected = document.querySelector('#titles tbody tr.selected');
+      const tbody = document.querySelector('#titles tbody');
+      if (!selected && tbody.rows.length > 0) {
+        selectRow(0);
+      }
+    });
+
+    // Click to select rows
+    document.getElementById('titles').addEventListener('click', (e) => {
+      const row = e.target.closest('tr');
+      if (row && row.dataset.row !== undefined) {
+        selectRow(parseInt(row.dataset.row));
+        loadContent();
+      }
+    });
+
+    // Global keyboard handler for '/' key and input arrow keys
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== document.getElementById('search')) {
+        e.preventDefault();
+        document.getElementById('search').focus();
+      }
+    });
+
+    // Input arrow key handling
+    document.getElementById('search').addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const container = document.querySelector('.table-container');
+        container.focus();
+
+        // Simulate the arrow key on the table container
+        const event = new KeyboardEvent('keydown', {
+          key: e.key,
+          bubbles: true,
+          cancelable: true
+        });
+        container.dispatchEvent(event);
+      }
+    });
+
+    // Focus search input on load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('search').focus();
+    });
 
     loadTitles();
   </script>

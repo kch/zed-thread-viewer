@@ -20,6 +20,8 @@ class ConversationViewer < Roda
       render("index.html")
     end
 
+
+
     r.get "titles" do
       rows = self.class.db.execute(<<~SQL)
         SELECT id, title, type, workspace_path, timestamp
@@ -29,10 +31,16 @@ class ConversationViewer < Roda
 
       rows.map do |id, title, type, workspace_path, timestamp|
         symbol = type == "thread" ? "𝐀" : "𝐓"
-        path_part = workspace_path ? "[#{File.basename(workspace_path)}] " : ""
-        date_part = timestamp ? "[#{Time.parse(timestamp).strftime('%Y-%m-%d')}] " : ""
-        display_title = "#{date_part}#{symbol} #{path_part}#{title}"
-        { id: id, title: display_title, type: type }
+        workspace = workspace_path ? File.basename(workspace_path) : ""
+        created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
+        {
+          id: id,
+          title: title,
+          type: type,
+          symbol: symbol,
+          workspace: workspace,
+          created_at: created_at
+        }
       end
     end
 
@@ -50,11 +58,19 @@ class ConversationViewer < Roda
 
       rows.map do |id, title, type, workspace_path, timestamp|
         symbol = type == "thread" ? "𝐀" : "𝐓"
-        path_part = workspace_path ? "[#{File.basename(workspace_path)}] " : ""
-        date_part = timestamp ? "[#{Time.parse(timestamp).strftime('%Y-%m-%d')}] " : ""
-        display_title = "#{date_part}#{symbol} #{path_part}#{title}"
-        { id: id, title: display_title, type: type }
+        workspace = workspace_path ? File.basename(workspace_path) : ""
+        created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
+        {
+          id: id,
+          title: title,
+          type: type,
+          symbol: symbol,
+          workspace: workspace,
+          created_at: created_at
+        }
       end
+
+
     end
 
 

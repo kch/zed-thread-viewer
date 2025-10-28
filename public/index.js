@@ -81,21 +81,19 @@ function displayTitles(titles) {
 }
 
 function selectRow(index) {
-  const table = document.querySelector('#titles');
-  const current = table.querySelector('.grid-row.selected');
+  const current = document.querySelector('#titles .grid-row.selected');
   current?.classList.remove('selected');
 
-  const rows = table.querySelectorAll('.grid-row');
-  if (rows[index]) {
-    rows[index].classList.add('selected');
-    rows[index].scrollIntoView({ block: 'nearest' });
+  const visibleRows = document.querySelectorAll('#titles .grid-row');
+  if (visibleRows[index]) {
+    visibleRows[index].classList.add('selected');
+    visibleRows[index].scrollIntoView({ block: 'nearest' });
 
     // Save selection position
     localStorage.setItem('selectedRowIndex', index);
 
     // Update global selected ID
-    const selectedRow = table.querySelectorAll('.grid-row')[index];
-    currentSelectedId = selectedRow ? selectedRow.dataset.id : null;
+    currentSelectedId = visibleRows[index].dataset.id;
   }
 }
 
@@ -158,29 +156,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!['ArrowUp', 'ArrowDown'].includes(e.key)) return;
 
     e.preventDefault();
-    const table = document.querySelector('#titles');
-    const rows = Array.from(table.querySelectorAll('.grid-row'));
-    const current = table.querySelector('.grid-row.selected');
-    const index = current ? parseInt(current.dataset.row) : -1;
+    const visibleRows = Array.from(document.querySelectorAll('#titles .grid-row'));
+    if (visibleRows.length === 0) return;
 
-    let newIndex = e.key === 'ArrowDown'
-      ? Math.min(index + 1, rows.length - 1)
-      : Math.max(index - 1, 0);
+    const currentSelected = document.querySelector('#titles .grid-row.selected');
+    const currentIndex = currentSelected ? visibleRows.indexOf(currentSelected) : -1;
 
-    if (index === -1 && e.key === 'ArrowDown') newIndex = 0;
+    let newIndex;
+    if (currentIndex === -1) {
+      // No valid selection, go to first row
+      newIndex = 0;
+    } else {
+      // Navigate from current selection
+      if (e.key === 'ArrowDown') {
+        newIndex = Math.min(currentIndex + 1, visibleRows.length - 1);
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+      }
+    }
 
-    currentSelectedId = rows[newIndex] ? rows[newIndex].dataset.id : null;
     selectRow(newIndex);
     loadContent();
-  });
-
-  // Auto-select first row when table container receives focus
-  document.querySelector('.table-container').addEventListener('focus', (e) => {
-    const selected = document.querySelector('#titles .grid-row.selected');
-    const table = document.querySelector('#titles');
-    if (!selected && table.querySelectorAll('.grid-row').length > 0) {
-      selectRow(0);
-    }
   });
 
   // Mouse selection handling

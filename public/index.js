@@ -216,6 +216,15 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       document.getElementById('search').focus();
     }
+
+    if (e.key === 'c' && document.activeElement === document.querySelector('.table-container')) {
+      e.preventDefault();
+      const selected = document.querySelector('#titles .grid-row.selected');
+      if (selected) {
+        const title = selected.querySelector('.col-title').textContent;
+        navigator.clipboard.writeText(title);
+      }
+    }
   });
 
   // Input arrow key handling

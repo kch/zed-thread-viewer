@@ -4,7 +4,7 @@ A unified browser for Zed conversations and threads with SQLite-based search.
 
 ## Features
 
-- **Unified view** - Browse both conversations (*.zed.json) and threads (from threads.db) 
+- **Unified view** - Browse both conversations (*.zed.json) and threads (from threads.db)
 - **Full-text search** - SQLite FTS5 search across titles and content
 - **Dual view modes** - Switch between formatted markdown and raw JSON
 - **Import system** - Processes and indexes both data sources
@@ -19,7 +19,7 @@ ruby import.rb [datasources_path] [output_db]
 ```
 
 Default paths:
-- `datasources/conversations/` - Zed conversation files (*.zed.json)  
+- `datasources/conversations/` - Zed conversation files (*.zed.json)
 - `datasources/threads/threads.db` - Zed threads database
 - `datasources/unified.db` - Generated unified database
 
@@ -43,7 +43,7 @@ Open http://localhost:9292
 
 The app displays entries with format: `[date] symbol [workspace] title`
 - `𝐀` = thread
-- `𝐓` = conversation  
+- `𝐓` = conversation
 - Date from file modification or thread update
 - Workspace path when available
 

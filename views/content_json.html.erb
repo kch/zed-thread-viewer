@@ -8,12 +8,12 @@
     pre { white-space: pre-wrap; word-wrap: break-word; line-height: 1.3; }
     .json-key { color: #5CCFE6; font-weight: bold; }
     .json-string { color: #D5FF80; }
-    .json-string-block { 
-      color: #CCCAC2; 
-      display: block; 
-      background: #1C212B; 
-      padding: 12px; 
-      margin: 6px 0 6px 0; 
+    .json-string-block {
+      color: #CCCAC2;
+      display: block;
+      background: #1C212B;
+      padding: 12px;
+      margin: 6px 0 6px 0;
       border: 1px solid #1A1F29;
       border-left: 4px solid #F28779;
       border-radius: 6px;
@@ -62,9 +62,9 @@
       const preview = document.getElementById(blockId + '_preview');
       const full = document.getElementById(blockId + '_full');
       const btn = document.getElementById(blockId + '_btn');
-      
+
       const isExpanded = full.style.display === 'block';
-      
+
       if (isExpanded) {
         // Collapse: show preview, hide full
         preview.style.display = 'block';

@@ -41,17 +41,17 @@
 
   <script>
     let allTitles = [];
-    
+
     async function loadTitles() {
       const response = await fetch('/titles');
       allTitles = await response.json();
       displayTitles(allTitles);
-      
+
       // Restore previous selection or auto-select first item
       const select = document.getElementById('titles');
       const savedSelection = localStorage.getItem('selectedEntryId');
       let selectionRestored = false;
-      
+
       if (savedSelection && select.options.length > 0) {
         for (let i = 0; i < select.options.length; i++) {
           if (select.options[i].value === savedSelection) {
@@ -61,19 +61,19 @@
           }
         }
       }
-      
+
       if (!selectionRestored && select.options.length > 0) {
         select.selectedIndex = 0;
       }
-      
+
       if (select.options.length > 0) {
         loadContent();
       }
     }
-    
+
     function displayTitles(titles) {
       const select = document.getElementById('titles');
-      select.innerHTML = titles.map(item => 
+      select.innerHTML = titles.map(item =>
         `<option value="${item.id}" class="type-${item.type}">${item.title}</option>`
       ).join('');
     }
@@ -84,7 +84,7 @@
         displayTitles(allTitles);
         return;
       }
-      
+
       const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
       const results = await response.json();
       displayTitles(results);
@@ -94,10 +94,10 @@
       const select = document.getElementById('titles');
       const id = select.value;
       if (!id) return;
-      
+
       // Save selection to localStorage
       localStorage.setItem('selectedEntryId', id);
-      
+
       document.getElementById('content-frame').src = `/content/${id}`;
     }
 

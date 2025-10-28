@@ -273,7 +273,11 @@ class ConversationViewer < Roda
         # Convert back to UTF-8
         processed_content = result.force_encoding('UTF-8')
 
-        html_content = Kramdown::Document.new(processed_content, {
+        # Manually escape HTML to prevent script execution
+        require 'cgi'
+        escaped_content = CGI.escapeHTML(processed_content)
+
+        html_content = Kramdown::Document.new(escaped_content, {
           input: 'GFM',
           syntax_highlighter: 'rouge',
           syntax_highlighter_opts: {

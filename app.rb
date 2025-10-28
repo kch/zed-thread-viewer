@@ -86,7 +86,7 @@ class ConversationViewer < Roda
       title, content, type, full_json = row
 
       response["Content-Type"] = "text/html; charset=utf-8"
-      response["Cache-Control"] = "max-age=3600, public"
+      response["Cache-Control"] = "max-age=600, public, must-revalidate"
       response["ETag"] = "\"#{id}-#{Digest::MD5.hexdigest(content + view)}\""
 
       if view == "json"
@@ -105,7 +105,7 @@ class ConversationViewer < Roda
                 # Format long strings as indented blocks
                 decoded = value.gsub(/\\n/, "\n").gsub(/\\t/, "\t").gsub(/\\"/, '"')
                 lines = decoded.split("\n")
-                block_id = "block_#{rand(100000)}"
+                block_id = "block_#{Digest::MD5.hexdigest("#{key}_#{indent}")}"
                 padding_left = (indent + 1) * 16 + 4  # Align under the key
 
                 if lines.length > 6
@@ -140,7 +140,7 @@ class ConversationViewer < Roda
             if obj.length > 50
               decoded = obj.gsub(/\\n/, "\n").gsub(/\\t/, "\t").gsub(/\\"/, '"')
               lines = decoded.split("\n")
-              block_id = "block_#{rand(100000)}"
+              block_id = "block_#{Digest::MD5.hexdigest("#{obj}_#{indent}")}"
               padding_left = indent * 16 + 4
 
               if lines.length > 6

@@ -8,6 +8,7 @@ gem "json"
 gem "sqlite3"
 gem "zstd-ruby"
 gem "kramdown"
+gem "kramdown-parser-gfm"
 gem "neatjson"
 
 # Optional for development

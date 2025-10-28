@@ -1,7 +1,6 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    ffi (1.17.2)
     ffi (1.17.2-aarch64-linux-gnu)
     ffi (1.17.2-aarch64-linux-musl)
     ffi (1.17.2-arm-linux-gnu)
@@ -35,7 +34,6 @@ GEM
     rexml (3.4.4)
     roda (3.97.0)
       rack
-    rouge (4.6.1)
     sqlite3 (2.7.4-aarch64-linux-gnu)
     sqlite3 (2.7.4-aarch64-linux-musl)
     sqlite3 (2.7.4-arm-linux-gnu)
@@ -71,7 +69,6 @@ DEPENDENCIES
   rackup
   rerun
   roda (~> 3.0)
-  rouge
   sqlite3
   tilt
   zstd-ruby

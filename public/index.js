@@ -250,7 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('search').focus();
     }
 
-    if (e.key === 'c' && document.activeElement === document.querySelector('.table-container')) {
+    // Skip if input is focused
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+      return;
+    }
+
+    if (e.key === 'c') {
       e.preventDefault();
       const selected = document.querySelector('#titles .grid-row.selected');
       if (selected) {
@@ -265,14 +270,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (e.key === 'r' && document.activeElement === document.querySelector('.table-container')) {
+    if (e.key === 'r') {
       e.preventDefault();
       runImport();
     }
 
-    if (e.key === 'v' && document.activeElement === document.querySelector('.table-container')) {
+    if (e.key === 'v') {
       e.preventDefault();
       toggleLayout();
+    }
+
+    if (e.key === 'j') {
+      e.preventDefault();
+      const selected = document.querySelector('#titles .grid-row.selected');
+      if (selected) {
+        const id = selected.dataset.id;
+        const iframe = document.querySelector(`#content-frame-${id}`);
+        if (iframe && iframe.contentWindow) {
+          try {
+            const toggleLink = iframe.contentDocument.querySelector('.toggle-link');
+            if (toggleLink) {
+              toggleLink.click();
+            }
+          } catch (e) {
+            // Cross-origin or iframe not loaded yet
+            console.log('Could not access iframe content for toggle');
+          }
+        }
+      }
     }
   });
 

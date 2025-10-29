@@ -13,6 +13,16 @@ class ConversationViewer < Roda
     @db ||= SQLite3::Database.new("./datasources/unified.db")
   end
 
+  def asset_with_hash(filename)
+    path = File.join("public", filename)
+    if File.exist?(path)
+      hash = Digest::MD5.hexdigest(File.read(path))
+      "/#{filename}?#{hash}"
+    else
+      "/#{filename}"
+    end
+  end
+
   route do |r|
     # Serve static files from public directory
     r.public

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title><%= CGI.escapeHTML(title) %></title>
-  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="<%= asset_with_hash('shared.css') %>">
   <style>
     .slash-command {
       background: #1C212B;

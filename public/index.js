@@ -258,6 +258,16 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.clipboard.writeText(title);
       }
     }
+
+    if (e.key === 'r' && document.activeElement === document.querySelector('.table-container')) {
+      e.preventDefault();
+      runImport();
+    }
+
+    if (e.key === 'v' && document.activeElement === document.querySelector('.table-container')) {
+      e.preventDefault();
+      toggleLayout();
+    }
   });
 
   // Input arrow key handling

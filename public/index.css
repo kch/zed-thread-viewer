@@ -146,3 +146,21 @@ input:focus { outline: 0; border-color: #FFCC66; }
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+.titles-table .grid-row.selected.copy-animation {
+  position: relative !important;
+  animation: shake 0.5s ease-out !important;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10% { transform: translateX(-2px) rotate(-0.5deg); }
+  20% { transform: translateX(2px) rotate(0.5deg); }
+  30% { transform: translateX(-2px) rotate(-0.5deg); }
+  40% { transform: translateX(2px) rotate(0.5deg); }
+  50% { transform: translateX(-1px) rotate(-0.25deg); }
+  60% { transform: translateX(1px) rotate(0.25deg); }
+  70% { transform: translateX(-1px) rotate(-0.25deg); }
+  80% { transform: translateX(1px) rotate(0.25deg); }
+  90% { transform: translateX(-0.5px) rotate(-0.1deg); }
+}

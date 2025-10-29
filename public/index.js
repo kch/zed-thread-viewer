@@ -256,6 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (selected) {
         const title = selected.querySelector('.col-title').textContent;
         navigator.clipboard.writeText(title);
+
+        // Animate the copied row with CSS class
+        selected.classList.add('copy-animation');
+        setTimeout(() => {
+          selected.classList.remove('copy-animation');
+        }, 800);
       }
     }
 

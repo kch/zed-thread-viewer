@@ -16,4 +16,31 @@
       window.parent.copyTitleById(title, id);
     }
   }
+
+  // Forward keydown events to parent window for global shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (window.parent && window.parent.document) {
+      // Create a new event in the parent window
+      const parentEvent = new window.parent.KeyboardEvent('keydown', {
+        key: e.key,
+        code: e.code,
+        keyCode: e.keyCode,
+        which: e.which,
+        shiftKey: e.shiftKey,
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        metaKey: e.metaKey,
+        bubbles: true,
+        cancelable: true
+      });
+
+      // Dispatch the event on the parent document
+      window.parent.document.dispatchEvent(parentEvent);
+
+      // Prevent default in iframe if parent handled it
+      if (['c', 'v', 'r', 'j', '/'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    }
+  });
 </script>

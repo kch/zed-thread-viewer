@@ -1,6 +1,26 @@
 let allTitles = [];
 let currentSelectedId = null;
-let iframeCache = new Map();
+let contentCache = new Map();
+let loadingIds = new Set();
+
+// Global function for JSON block expansion - must be defined early
+window.toggleBlock = function(blockId) {
+  const preview = document.getElementById(blockId + '_preview');
+  const full = document.getElementById(blockId + '_full');
+  const btn = document.getElementById(blockId + '_btn');
+
+  const isExpanded = full.style.display === 'block';
+
+  if (isExpanded) {
+    preview.style.display = 'block';
+    full.style.display = 'none';
+    btn.textContent = 'show more';
+  } else {
+    preview.style.display = 'none';
+    full.style.display = 'block';
+    btn.textContent = 'collapse';
+  }
+};
 
 async function loadTitles() {
   const response = await fetch('/titles');
@@ -123,31 +143,72 @@ async function loadContent() {
   const id = getSelectedId();
   if (!id) return;
 
+
+
   localStorage.setItem('selectedEntryId', id);
 
   const container = document.getElementById('content-container');
 
-  // Hide all current iframes
-  container.querySelectorAll('iframe').forEach(iframe => {
-    iframe.classList.remove('active');
+  // Hide all current content frames
+  container.querySelectorAll('.content-frame').forEach(frame => {
+    frame.classList.remove('active');
   });
 
-  // Check if we already have this iframe
-  if (iframeCache.has(id)) {
-    const cachedIframe = iframeCache.get(id);
-    cachedIframe.classList.add('active');
+  // Check if we already have this content cached
+  if (contentCache.has(id)) {
+    const cachedFrame = contentCache.get(id);
+
+    // Always check if this is still the selected row after cache lookup
+    if (getSelectedId() === id) {
+      cachedFrame.classList.add('active');
+    }
     return;
   }
 
-  // Create new iframe for this content
-  const iframe = document.createElement('iframe');
-  iframe.id = `content-frame-${id}`;
-  iframe.src = `/content/${id}`;
-  iframe.title = "Thread content viewer";
-  iframe.classList.add('active');
+  // Prevent duplicate loading
+  if (loadingIds.has(id)) {
 
-  container.appendChild(iframe);
-  iframeCache.set(id, iframe);
+    return;
+  }
+
+  loadingIds.add(id);
+
+
+  // Fetch and create new content frame
+  try {
+    const response = await fetch(`/content/${id}`);
+    const html = await response.text();
+
+    // Check if selection changed while we were fetching
+    if (getSelectedId() !== id) {
+
+      loadingIds.delete(id);
+      return; // Don't add the frame if selection changed
+    }
+
+    const contentFrame = document.createElement('div');
+    contentFrame.className = 'content-frame active';
+    contentFrame.id = `content-frame-${id}`;
+    contentFrame.innerHTML = html;
+
+    container.appendChild(contentFrame);
+    contentCache.set(id, contentFrame);
+
+
+    // Final check - ensure this is still the selected row
+    if (getSelectedId() !== id) {
+      contentFrame.classList.remove('active');
+
+    }
+  } catch (error) {
+    console.error('Failed to load content:', error);
+    if (getSelectedId() === id) {
+      container.innerHTML = '<div class="content-frame active"><div class="content-frame-header">Error loading content</div></div>';
+    }
+  } finally {
+    loadingIds.delete(id);
+
+  }
 }
 
 // Table keyboard navigation
@@ -255,13 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const selected = document.querySelector('#titles .grid-row.selected');
       if (selected) {
         const title = selected.querySelector('.col-title').textContent;
-        navigator.clipboard.writeText(title);
-
-        // Animate the copied row with CSS class
-        selected.classList.add('copy-animation');
-        setTimeout(() => {
-          selected.classList.remove('copy-animation');
-        }, 800);
+        const id = selected.dataset.id;
+        copyTitleById(title, id);
       }
     }
 
@@ -298,6 +354,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadTitles();
 });
+
+// Shared copy functionality that targets by ID
+function copyTitleById(title, id) {
+
+  navigator.clipboard.writeText(title).then(() => {
+    // Animate copy button in content frame for this ID
+    const contentFrame = document.querySelector(`#content-frame-${id}`);
+
+    if (contentFrame) {
+      const copyBtn = contentFrame.querySelector('.content-copy-btn');
+
+      if (copyBtn) {
+        const original = copyBtn.textContent;
+        copyBtn.textContent = 'copied!';
+        setTimeout(() => copyBtn.textContent = original, 1000);
+      }
+    }
+
+    // Animate the table row for this ID
+    const tableRow = document.querySelector(`#titles .grid-row[data-id="${id}"]`);
+
+    if (tableRow) {
+      tableRow.classList.add('copy-animation');
+      setTimeout(() => {
+        tableRow.classList.remove('copy-animation');
+      }, 800);
+    }
+  });
+}
+
+// Global functions for content frame interactions
+window.copyTitle = function(title) {
+  // Extract ID from the content frame wrapper
+  const wrapper = event.target.closest('.content-frame-wrapper');
+
+  const idElement = wrapper.querySelector('[id^="markdown-view-"], [id^="json-view-"]');
+
+  const id = idElement ? idElement.id.split('-').pop() : null;
+
+
+  if (id) {
+    copyTitleById(title, id);
+  }
+};
+
+window.toggleView = function(id) {
+  const wrapper = event.target.closest('.content-frame-wrapper');
+  const currentView = wrapper.dataset.view;
+
+  if (currentView === 'markdown') {
+    wrapper.dataset.view = 'json';
+  } else {
+    wrapper.dataset.view = 'markdown';
+  }
+};
+
+
 
 async function runImport() {
   const btn = document.getElementById('reload-btn');

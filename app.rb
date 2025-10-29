@@ -94,11 +94,10 @@ class ConversationViewer < Roda
 
       response["Content-Type"] = "text/html; charset=utf-8"
 
-      # Render markdown view
+      # Process markdown content
       require 'kramdown'
       require 'kramdown-parser-gfm'
-
-      # Process slash command output sections and message roles
+      require 'cgi'
       processed_content = content.dup
       parsed_json = JSON.parse(full_json)
 
@@ -201,29 +200,7 @@ class ConversationViewer < Roda
       require 'loofah'
       html_content = Loofah.fragment(html_content).scrub!(:escape)
 
-      render("content_markdown.html", locals: {
-        title: title,
-        type: type,
-        id: id,
-        html_content: html_content,
-        toggle_url: "/content/#{id}/json",
-        toggle_text: "Show JSON"
-      })
-    end
-
-    r.get "content", Integer, "json" do |id|
-      row = self.class.db.execute(<<~SQL, [id]).first
-        SELECT title, content, type, full_json FROM entries WHERE id = ?
-      SQL
-
-      return "Not found" unless row
-
-      title, content, type, full_json = row
-
-      response["Content-Type"] = "text/html; charset=utf-8"
-
-      require 'cgi'
-
+      # Process JSON content
       def format_json_with_blocks(obj, indent = 0)
         spaces = "  " * indent
         case obj
@@ -301,16 +278,14 @@ class ConversationViewer < Roda
         end
       end
 
-      parsed_json = JSON.parse(full_json)
       highlighted_json = format_json_with_blocks(parsed_json)
 
-      render("content_json.html", locals: {
+      render("_content_partial.html", locals: {
         title: title,
         type: type,
         id: id,
-        highlighted_json: highlighted_json,
-        toggle_url: "/content/#{id}",
-        toggle_text: "Show Content"
+        html_content: html_content,
+        highlighted_json: highlighted_json
       })
     end
   end

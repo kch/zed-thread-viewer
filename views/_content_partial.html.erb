@@ -1,0 +1,23 @@
+<div class="content-frame-wrapper" data-view="markdown">
+  <div class="content-frame-header">
+    <div class="type-badge type-<%= type %>">
+      <%= type == 'conversation' ? 'TEXT THREAD' : 'AGENT THREAD' %>
+    </div>
+    <strong><%= CGI.escapeHTML(title) %></strong>
+    <button class="content-copy-btn" onclick="copyTitle('<%= CGI.escapeHTML(title) %>')">copy</button>
+    <button class="content-toggle-btn" onclick="toggleView('<%= id %>')">
+      <span class="toggle-json">Show JSON</span>
+      <span class="toggle-markdown">Show Content</span>
+    </button>
+  </div>
+
+  <div class="content-views">
+    <div class="markdown-view" id="markdown-view-<%= id %>">
+      <%= html_content %>
+    </div>
+
+    <div class="json-view" id="json-view-<%= id %>">
+      <pre><%= highlighted_json %></pre>
+    </div>
+  </div>
+</div>

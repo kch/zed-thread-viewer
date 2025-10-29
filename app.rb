@@ -21,6 +21,11 @@ class ConversationViewer < Roda
       render("index.html")
     end
 
+    r.post "import" do
+      system("bin/import")
+      { success: true }
+    end
+
 
 
     r.get "titles" do
@@ -86,8 +91,6 @@ class ConversationViewer < Roda
       title, content, type, full_json = row
 
       response["Content-Type"] = "text/html; charset=utf-8"
-      response["Cache-Control"] = "max-age=600, public, must-revalidate"
-      response["ETag"] = "\"#{id}-#{Digest::MD5.hexdigest(content + view)}\""
 
       if view == "json"
         require 'cgi'

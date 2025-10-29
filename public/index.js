@@ -245,3 +245,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadTitles();
 });
+
+async function runImport() {
+  const btn = document.getElementById('reload-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    await fetch('/import', { method: 'POST' });
+    const searchQuery = document.getElementById('search').value.trim();
+    if (searchQuery) {
+      await searchTitles();
+    } else {
+      await loadTitles();
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⟳';
+  }
+}
+
+function toggleLayout() {
+  const container = document.querySelector('.container');
+  container.classList.toggle('vertical-layout');
+}

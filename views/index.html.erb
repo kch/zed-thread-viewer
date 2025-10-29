@@ -9,7 +9,11 @@
 <body>
   <div class="container">
     <div class="titles-section">
-      <input type="text" id="search" placeholder="Search..." oninput="searchTitles()">
+      <div class="search-controls">
+        <input type="text" id="search" placeholder="Search..." oninput="searchTitles()">
+        <button id="reload-btn" onclick="runImport()" title="Reload data">⟳</button>
+        <button id="layout-btn" onclick="toggleLayout()" title="Toggle layout">⚏</button>
+      </div>
       <div class="table-container" tabindex="0">
         <div class="titles-table" id="titles">
           <div class="grid-header col-symbol"></div>

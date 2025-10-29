@@ -156,13 +156,17 @@ async function loadContent() {
 
   // Check if we already have this content cached
   if (contentCache.has(id)) {
+    console.log('Using cached content for id:', id);
     const cachedFrame = contentCache.get(id);
+    console.log('Cached frame exists:', !!cachedFrame);
 
     // Always check if this is still the selected row after cache lookup
     if (getSelectedId() === id) {
       cachedFrame.classList.add('active');
     }
     return;
+  } else {
+    console.log('No cached content for id:', id, 'cache size:', contentCache.size);
   }
 
   // Prevent duplicate loading
@@ -193,6 +197,7 @@ async function loadContent() {
 
     container.appendChild(contentFrame);
     contentCache.set(id, contentFrame);
+    console.log('Added to cache:', id, 'new cache size:', contentCache.size);
 
 
     // Final check - ensure this is still the selected row

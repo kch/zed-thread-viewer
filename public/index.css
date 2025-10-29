@@ -139,3 +139,10 @@ input:focus { outline: 0; border-color: #FFCC66; }
   width: 100%;
   height: 67vh;
 }
+
+.dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}

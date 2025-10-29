@@ -186,15 +186,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const row = e.target.closest('.grid-row');
     if (row && row.dataset.row !== undefined) {
       isDragging = true;
+      document.body.classList.add('dragging');
+
+      // Create overlay over iframe container only
+      const overlay = document.createElement('div');
+      overlay.id = 'drag-overlay';
+      overlay.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;';
+      document.getElementById('content-container').appendChild(overlay);
+
       currentSelectedId = row.dataset.id;
       selectRow(parseInt(row.dataset.row));
       loadContent();
     }
   });
 
-  document.getElementById('titles').addEventListener('mousemove', (e) => {
+  window.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
-    const row = e.target.closest('.grid-row');
+    const titlesTable = document.getElementById('titles');
+    const tableRect = titlesTable.getBoundingClientRect();
+    const fixedX = tableRect.left + (tableRect.width / 2);
+    const elementUnderMouse = document.elementFromPoint(fixedX, e.clientY);
+    const row = elementUnderMouse?.closest('.grid-row');
     if (row && row.dataset.row !== undefined) {
       currentSelectedId = row.dataset.id;
       selectRow(parseInt(row.dataset.row));
@@ -202,9 +214,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.addEventListener('mouseup', () => {
+  window.addEventListener('mouseup', () => {
     isDragging = false;
+    document.body.classList.remove('dragging');
+
+    // Remove overlay
+    const overlay = document.getElementById('drag-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
   });
+
+
 
   // Global keyboard handler for '/' key and input arrow keys
   document.addEventListener('keydown', (e) => {

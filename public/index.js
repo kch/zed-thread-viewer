@@ -225,7 +225,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-
+  // Handle wheel scroll during drag to update selection
+  document.getElementById('titles').addEventListener('wheel', (e) => {
+    if (!isDragging) return;
+    // Use setTimeout to let scroll happen first, then update selection
+    setTimeout(() => {
+      const titlesTable = document.getElementById('titles');
+      const tableRect = titlesTable.getBoundingClientRect();
+      const fixedX = tableRect.left + (tableRect.width / 2);
+      const elementUnderMouse = document.elementFromPoint(fixedX, e.clientY);
+      const row = elementUnderMouse?.closest('.grid-row');
+      if (row && row.dataset.row !== undefined) {
+        currentSelectedId = row.dataset.id;
+        selectRow(parseInt(row.dataset.row));
+        loadContent();
+      }
+    }, 0);
+  });
 
   // Global keyboard handler for '/' key and input arrow keys
   document.addEventListener('keydown', (e) => {

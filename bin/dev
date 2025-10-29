@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec rerun -c --notify osx -- bin/serve

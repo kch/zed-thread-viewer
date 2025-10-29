@@ -260,13 +260,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const selected = document.querySelector('#titles .grid-row.selected');
       if (selected) {
         const title = selected.querySelector('.col-title').textContent;
-        navigator.clipboard.writeText(title);
-
-        // Animate the copied row with CSS class
-        selected.classList.add('copy-animation');
-        setTimeout(() => {
-          selected.classList.remove('copy-animation');
-        }, 800);
+        const id = selected.dataset.id;
+        copyTitleById(title, id);
       }
     }
 
@@ -323,6 +318,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadTitles();
 });
+
+// Shared copy functionality that targets by ID
+function copyTitleById(title, id) {
+  navigator.clipboard.writeText(title).then(() => {
+    // Animate copy button in iframe for this ID
+    const iframe = document.querySelector(`#content-frame-${id}`);
+    if (iframe && iframe.contentWindow) {
+      try {
+        const copyBtn = iframe.contentDocument.querySelector('.copy-btn');
+        if (copyBtn) {
+          const original = copyBtn.textContent;
+          copyBtn.textContent = 'copied!';
+          setTimeout(() => copyBtn.textContent = original, 1000);
+        }
+      } catch (e) {
+        // Cross-origin or iframe not loaded yet
+      }
+    }
+
+    // Animate the table row for this ID
+    const tableRow = document.querySelector(`#titles .grid-row[data-id="${id}"]`);
+    if (tableRow) {
+      tableRow.classList.add('copy-animation');
+      setTimeout(() => {
+        tableRow.classList.remove('copy-animation');
+      }, 800);
+    }
+  });
+}
+
+// Expose copy function to iframes
+window.copyTitleById = copyTitleById;
 
 async function runImport() {
   const btn = document.getElementById('reload-btn');

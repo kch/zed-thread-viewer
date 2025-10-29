@@ -9,11 +9,11 @@
 
 <script>
   function copyTitle() {
-    navigator.clipboard.writeText("<%= CGI.escapeHTML(title) %>").then(() => {
-      const btn = event.target;
-      const original = btn.textContent;
-      btn.textContent = 'copied!';
-      setTimeout(() => btn.textContent = original, 1000);
-    });
+    // Call parent window's shared copy function
+    if (window.parent && window.parent.copyTitleById) {
+      const title = "<%= CGI.escapeHTML(title) %>";
+      const id = "<%= id %>";
+      window.parent.copyTitleById(title, id);
+    }
   }
 </script>

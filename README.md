@@ -1,12 +1,14 @@
 # Zed Thread Viewer
 
-A unified browser for Zed conversations and threads with SQLite-based search.
+A unified browser for Zed AI threads, with SQLite-based search.
+
+Quick preview, star, jump around fast. Eventually, copy title to find in zed.
 
 Mostly vibe-coded, so kinda gnarly. But it's useful.
 
 Slow in Safari when quickly switching selection becuase it locks up to load iframes. :/
 
-This is somewhat unfinished, rendering of threads is the most lacking, but generally you wanna find them and copy title and search for it in zed.
+This is somewhat unfinished, rendering of threads is the most lacking, but generally look at them in zed once you find what you need.
 
 ## Features
 

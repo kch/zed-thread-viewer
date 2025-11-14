@@ -2,6 +2,11 @@
 
 A unified browser for Zed conversations and threads with SQLite-based search.
 
+Mostly vibe-coded, so kinda gnarly. But it's useful.
+
+Slow in Safari when quickly switching selection becuase it locks up to load iframes. :/
+
+
 ## Features
 
 - **Unified view** - Browse both conversations (*.zed.json) and threads (from threads.db)

@@ -6,6 +6,7 @@ Mostly vibe-coded, so kinda gnarly. But it's useful.
 
 Slow in Safari when quickly switching selection becuase it locks up to load iframes. :/
 
+This is somewhat unfinished, rendering of threads is the most lacking, but generally you wanna find them and copy title and search for it in zed.
 
 ## Features
 

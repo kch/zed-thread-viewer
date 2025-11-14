@@ -3,7 +3,7 @@
     <%= type == 'conversation' ? 'TEXT THREAD' : 'AGENT THREAD' %>
   </div>
   <strong><%= CGI.escapeHTML(title) %></strong>
-  <button class="star-btn" onclick="toggleHeaderStar()"><%= starred ? '★' : '☆' %></button>
+  <button class="star-btn <%= starred ? 'star-enabled' : 'star-disabled' %>" onclick="toggleHeaderStar()"><%= starred ? '★' : '☆' %></button>
   <button class="copy-btn" onclick="copyTitle()">copy</button>
   <a href="<%= toggle_url %>" class="toggle-link"><%= toggle_text %></a>
 </div>
@@ -25,6 +25,8 @@
       window.parent.toggleStarById(id);
     }
   }
+
+
 
   // Forward keydown events to parent window for global shortcuts
   document.addEventListener('keydown', (e) => {

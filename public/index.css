@@ -81,6 +81,7 @@ input:focus { outline: 0; border-color: #FFCC66; }
   cursor: pointer;
   font-size: 12px;
 }
+
 .titles-table .col-symbol {
   max-width: 2em;
   text-align: center;
@@ -185,6 +186,22 @@ input:focus { outline: 0; border-color: #FFCC66; }
   min-width: 14px;
   text-align: center;
 }
+
+.star-enabled {
+  color: #FFCC66 !important;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: rgba(36, 41, 54, 0.7);
+}
+
+.star-disabled {
+  color: #707A8C !important;
+}
+
+.titles-table .grid-row.selected .star-enabled {
+  color: #FFCC66 !important;
+}
+
+
 
 .dragging {
   user-select: none;

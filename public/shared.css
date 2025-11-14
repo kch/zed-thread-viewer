@@ -59,7 +59,6 @@ body {
 .star-btn {
   background: #242936;
   border: 1px solid #1A1F29;
-  color: #FFCC66;
   padding: 2px 6px;
   font-size: 12px;
   border-radius: 3px;
@@ -69,4 +68,12 @@ body {
 
 .star-btn:hover {
   background: #2A2F3A;
+}
+
+.star-enabled {
+  color: #FFCC66 !important;
+}
+
+.star-disabled {
+  color: #707A8C !important;
 }

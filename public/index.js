@@ -69,12 +69,15 @@ function displayTitles(titles) {
       <div class="grid-cell col-project">${workspace}</div>
     `;
 
-    // Add click handler to star cell after creation
+    // Add click handler and CSS class to star cell after creation
     const starCell = row.querySelector('.col-star');
     starCell.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleStarById(item.id);
     });
+
+    // Apply star CSS class
+    starCell.className = `grid-cell col-star ${item.starred ? 'star-enabled' : 'star-disabled'}`;
     table.appendChild(row);
   });
 
@@ -392,6 +395,8 @@ async function toggleStarById(id) {
         const tableStarCell = tableRow.querySelector('.col-star');
         if (tableStarCell) {
           tableStarCell.textContent = starIcon;
+          // Update CSS class
+          tableStarCell.className = `grid-cell col-star ${newStarred ? 'star-enabled' : 'star-disabled'}`;
         }
       }
 
@@ -402,6 +407,7 @@ async function toggleStarById(id) {
           const headerStarBtn = iframe.contentDocument.querySelector('.star-btn');
           if (headerStarBtn) {
             headerStarBtn.textContent = starIcon;
+            headerStarBtn.className = `star-btn ${newStarred ? 'star-enabled' : 'star-disabled'}`;
           }
         } catch (e) {
           // Cross-origin or iframe not loaded yet

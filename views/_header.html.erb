@@ -3,6 +3,7 @@
     <%= type == 'conversation' ? 'TEXT THREAD' : 'AGENT THREAD' %>
   </div>
   <strong><%= CGI.escapeHTML(title) %></strong>
+  <button class="star-btn" onclick="toggleHeaderStar()"><%= starred ? '★' : '☆' %></button>
   <button class="copy-btn" onclick="copyTitle()">copy</button>
   <a href="<%= toggle_url %>" class="toggle-link"><%= toggle_text %></a>
 </div>
@@ -14,6 +15,14 @@
       const title = "<%= CGI.escapeHTML(title) %>";
       const id = "<%= id %>";
       window.parent.copyTitleById(title, id);
+    }
+  }
+
+  function toggleHeaderStar() {
+    // Call parent window's shared star function
+    if (window.parent && window.parent.toggleStarById) {
+      const id = "<%= id %>";
+      window.parent.toggleStarById(id);
     }
   }
 
@@ -38,7 +47,7 @@
       window.parent.document.dispatchEvent(parentEvent);
 
       // Prevent default in iframe if parent handled it
-      if (['c', 'v', 'r', 'j', '/'].includes(e.key.toLowerCase())) {
+      if (['c', 'v', 'r', 'j', 'f', '/'].includes(e.key.toLowerCase())) {
         e.preventDefault();
       }
     }

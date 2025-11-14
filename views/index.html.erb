@@ -11,11 +11,13 @@
     <div class="titles-section">
       <div class="search-controls">
         <input type="text" id="search" placeholder="Search... (/)" oninput="searchTitles()">
+        <button id="star-filter-btn" onclick="toggleStarFilter()" title="Filter starred" tabindex="-1">☆</button>
         <button id="reload-btn" onclick="runImport()" title="Reload data" tabindex="-1">⟳</button>
         <button id="layout-btn" onclick="toggleLayout()" title="Toggle layout" tabindex="-1">⚏</button>
       </div>
       <div class="table-container" tabindex="0">
         <div class="titles-table" id="titles">
+          <div class="grid-header col-star"></div>
           <div class="grid-header col-symbol"></div>
           <div class="grid-header col-date">Date</div>
           <div class="grid-header col-title">Title</div>

@@ -10,7 +10,30 @@ class ConversationViewer < Roda
   plugin :public, root: "public"
 
   def self.db
-    @db ||= SQLite3::Database.new("./datasources/unified.db")
+    @db ||= begin
+      db = SQLite3::Database.new("./datasources/unified.db")
+      setup_stars_db(db)
+      db
+    end
+  end
+
+  def self.setup_stars_db(db)
+    stars_db_path = "./datasources/stars.db"
+
+    # Create stars database if it doesn't exist
+    stars_db = SQLite3::Database.new(stars_db_path)
+    stars_db.execute <<~SQL
+      CREATE TABLE IF NOT EXISTS stars (
+        file_path TEXT,
+        original_id TEXT,
+        starred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (file_path, original_id)
+      )
+    SQL
+    stars_db.close
+
+    # Attach to unified database
+    db.execute("ATTACH DATABASE '#{stars_db_path}' AS stars")
   end
 
   def asset_with_hash(filename)
@@ -37,13 +60,28 @@ class ConversationViewer < Roda
     end
 
     r.get "titles" do
-      rows = self.class.db.execute(<<~SQL)
-        SELECT id, title, type, project, timestamp
-        FROM entries
-        ORDER BY timestamp DESC
-      SQL
+      starred_only = r.params["starred"] == "true"
 
-      rows.map do |id, title, type, project, timestamp|
+      sql = if starred_only
+        <<~SQL
+          SELECT e.id, e.title, e.type, e.project, e.timestamp,
+                 CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+          FROM entries e
+          JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+          ORDER BY e.timestamp DESC
+        SQL
+      else
+        <<~SQL
+          SELECT e.id, e.title, e.type, e.project, e.timestamp,
+                 CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+          FROM entries e
+          LEFT JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+          ORDER BY e.timestamp DESC
+        SQL
+      end
+
+      rows = self.class.db.execute(sql)
+      rows.map do |id, title, type, project, timestamp, starred|
         symbol = type == "thread" ? "𝐀" : "𝐓"
         created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
         {
@@ -52,7 +90,8 @@ class ConversationViewer < Roda
           type: type,
           symbol: symbol,
           workspace: project || "",
-          created_at: created_at
+          created_at: created_at,
+          starred: starred == 1
         }
       end
     end
@@ -61,15 +100,32 @@ class ConversationViewer < Roda
       query = r.params["q"].to_s.strip
       return [] if query.empty?
 
-      rows = self.class.db.execute(<<~SQL, ["#{query}*"])
-        SELECT e.id, e.title, e.type, e.project, e.timestamp
-        FROM entries e
-        JOIN entries_fts ON entries_fts.rowid = e.id
-        WHERE entries_fts MATCH ?
-        ORDER BY e.timestamp DESC
-      SQL
+      starred_only = r.params["starred"] == "true"
 
-      rows.map do |id, title, type, project, timestamp|
+      sql = if starred_only
+        <<~SQL
+          SELECT e.id, e.title, e.type, e.project, e.timestamp,
+                 CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+          FROM entries e
+          JOIN entries_fts ON entries_fts.rowid = e.id
+          JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+          WHERE entries_fts MATCH ?
+          ORDER BY e.timestamp DESC
+        SQL
+      else
+        <<~SQL
+          SELECT e.id, e.title, e.type, e.project, e.timestamp,
+                 CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+          FROM entries e
+          JOIN entries_fts ON entries_fts.rowid = e.id
+          LEFT JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+          WHERE entries_fts MATCH ?
+          ORDER BY e.timestamp DESC
+        SQL
+      end
+
+      rows = self.class.db.execute(sql, ["#{query}*"])
+      rows.map do |id, title, type, project, timestamp, starred|
         symbol = type == "thread" ? "𝐀" : "𝐓"
         created_at = timestamp ? Time.parse(timestamp).iso8601 : nil
         {
@@ -78,19 +134,61 @@ class ConversationViewer < Roda
           type: type,
           symbol: symbol,
           workspace: project || "",
-          created_at: created_at
+          created_at: created_at,
+          starred: starred == 1
         }
+      end
+    end
+
+    r.on "star" do
+      r.is Integer do |id|
+        if r.post?
+          row = self.class.db.execute(<<~SQL, [id]).first
+            SELECT e.file_path, e.original_id,
+                   CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+            FROM entries e
+            LEFT JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+            WHERE e.id = ?
+          SQL
+          return { success: false, error: "Entry not found" } unless row
+
+          file_path, original_id, currently_starred = row
+
+          begin
+            if currently_starred == 1
+              # Unstar
+              self.class.db.execute(
+                "DELETE FROM stars.stars WHERE file_path = ? OR original_id = ?",
+                [file_path, original_id]
+              )
+              { success: true, starred: false }
+            else
+              # Star
+              self.class.db.execute(
+                "INSERT OR REPLACE INTO stars.stars (file_path, original_id) VALUES (?, ?)",
+                [file_path, original_id]
+              )
+              { success: true, starred: true }
+            end
+          rescue => e
+            { success: false, error: e.message }
+          end
+        end
       end
     end
 
     r.get "content", Integer do |id|
       row = self.class.db.execute(<<~SQL, [id]).first
-        SELECT title, content, type, full_json FROM entries WHERE id = ?
+        SELECT e.title, e.content, e.type, e.full_json, e.file_path, e.original_id,
+               CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+        FROM entries e
+        LEFT JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+        WHERE e.id = ?
       SQL
 
       return "Not found" unless row
 
-      title, content, type, full_json = row
+      title, content, type, full_json, file_path, original_id, starred = row
 
       response["Content-Type"] = "text/html; charset=utf-8"
 
@@ -207,18 +305,23 @@ class ConversationViewer < Roda
         id: id,
         html_content: html_content,
         toggle_url: "/content/#{id}/json",
-        toggle_text: "Show JSON"
+        toggle_text: "Show JSON",
+        starred: starred == 1
       })
     end
 
     r.get "content", Integer, "json" do |id|
       row = self.class.db.execute(<<~SQL, [id]).first
-        SELECT title, content, type, full_json FROM entries WHERE id = ?
+        SELECT e.title, e.content, e.type, e.full_json, e.file_path, e.original_id,
+               CASE WHEN s.file_path IS NOT NULL OR s.original_id IS NOT NULL THEN 1 ELSE 0 END as starred
+        FROM entries e
+        LEFT JOIN stars.stars s ON (e.file_path = s.file_path OR e.original_id = s.original_id)
+        WHERE e.id = ?
       SQL
 
       return "Not found" unless row
 
-      title, content, type, full_json = row
+      title, content, type, full_json, file_path, original_id, starred = row
 
       response["Content-Type"] = "text/html; charset=utf-8"
 
@@ -310,7 +413,8 @@ class ConversationViewer < Roda
         id: id,
         highlighted_json: highlighted_json,
         toggle_url: "/content/#{id}",
-        toggle_text: "Show Content"
+        toggle_text: "Show Content",
+        starred: starred == 1
       })
     end
   end

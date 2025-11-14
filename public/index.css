@@ -15,7 +15,7 @@ input:focus { outline: 0; border-color: #FFCC66; }
 
 .titles-table {
   display: grid;
-  grid-template-columns: max-content max-content 1fr max-content;
+  grid-template-columns: max-content max-content max-content 1fr max-content;
   background: #1C212B;
   outline: none;
   width: 100%;
@@ -75,8 +75,14 @@ input:focus { outline: 0; border-color: #FFCC66; }
   text-align: left;
 }
 
+.titles-table .col-star {
+  max-width: 2em;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+}
 .titles-table .col-symbol {
-  max-width: 1em;
+  max-width: 2em;
   text-align: center;
   font-weight: bold;
 }
@@ -125,6 +131,10 @@ input:focus { outline: 0; border-color: #FFCC66; }
 .search-controls button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.search-controls button.active {
+  background: #FFCC66;
+  color: #1F2430;
 }
 .vertical-layout {
   flex-direction: column;

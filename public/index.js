@@ -1,9 +1,11 @@
 let allTitles = [];
 let currentSelectedId = null;
 let iframeCache = new Map();
+let starFilterActive = false;
 
 async function loadTitles() {
-  const response = await fetch('/titles');
+  const url = starFilterActive ? '/titles?starred=true' : '/titles';
+  const response = await fetch(url);
   allTitles = await response.json();
   displayTitles(allTitles);
 
@@ -50,6 +52,7 @@ function displayTitles(titles) {
   existingRows.forEach(row => row.remove());
 
   titles.forEach((item, index) => {
+    const starIcon = item.starred ? '★' : '☆';
     const symbol = item.symbol || '';
     const date = item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : '';
     const workspace = item.workspace || '';
@@ -59,11 +62,19 @@ function displayTitles(titles) {
     row.dataset.row = index;
     row.dataset.id = item.id;
     row.innerHTML = `
+      <div class="grid-cell col-star">${starIcon}</div>
       <div class="grid-cell col-symbol">${symbol}</div>
       <div class="grid-cell col-date">${date}</div>
       <div class="grid-cell col-title">${item.title}</div>
       <div class="grid-cell col-project">${workspace}</div>
     `;
+
+    // Add click handler to star cell after creation
+    const starCell = row.querySelector('.col-star');
+    starCell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleStarById(item.id);
+    });
     table.appendChild(row);
   });
 
@@ -114,7 +125,8 @@ async function searchTitles() {
     return;
   }
 
-  const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+  const starredParam = starFilterActive ? '&starred=true' : '';
+  const response = await fetch(`/search?q=${encodeURIComponent(query)}${starredParam}`);
   const results = await response.json();
   displayTitles(results);
 }
@@ -275,6 +287,15 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleLayout();
     }
 
+    if (e.key === 'f') {
+      e.preventDefault();
+      const selected = document.querySelector('#titles .grid-row.selected');
+      if (selected) {
+        const id = selected.dataset.id;
+        toggleStarById(id);
+      }
+    }
+
     if (e.key === 'j') {
       e.preventDefault();
       const selected = document.querySelector('#titles .grid-row.selected');
@@ -348,8 +369,69 @@ function copyTitleById(title, id) {
   });
 }
 
-// Expose copy function to iframes
+// Shared star functionality that targets by ID
+async function toggleStarById(id) {
+  try {
+    const response = await fetch(`/star/${id}`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      const newStarred = result.starred;
+      const starIcon = newStarred ? '★' : '☆';
+
+      // Update table view star cell for this ID
+      const tableRow = document.querySelector(`#titles .grid-row[data-id="${id}"]`);
+      if (tableRow) {
+        const tableStarCell = tableRow.querySelector('.col-star');
+        if (tableStarCell) {
+          tableStarCell.textContent = starIcon;
+        }
+      }
+
+      // Update iframe header star button for this ID
+      const iframe = document.querySelector(`#content-frame-${id}`);
+      if (iframe && iframe.contentWindow) {
+        try {
+          const headerStarBtn = iframe.contentDocument.querySelector('.star-btn');
+          if (headerStarBtn) {
+            headerStarBtn.textContent = starIcon;
+          }
+        } catch (e) {
+          // Cross-origin or iframe not loaded yet
+        }
+      }
+
+      // Update allTitles cache
+      const item = allTitles.find(t => t.id == id);
+      if (item) {
+        item.starred = newStarred;
+      }
+
+      // Reload if we're filtering starred and this item was unstarred
+      if (starFilterActive && !newStarred) {
+        const searchQuery = document.getElementById('search').value.trim();
+        if (searchQuery) {
+          await searchTitles();
+        } else {
+          await loadTitles();
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to toggle star:', error);
+  }
+}
+
+// Expose functions to iframes
 window.copyTitleById = copyTitleById;
+window.toggleStarById = toggleStarById;
 
 async function runImport() {
   const btn = document.getElementById('reload-btn');
@@ -372,4 +454,26 @@ async function runImport() {
 function toggleLayout() {
   const container = document.querySelector('.container');
   container.classList.toggle('vertical-layout');
+}
+
+
+
+async function toggleStarFilter() {
+  starFilterActive = !starFilterActive;
+  const btn = document.getElementById('star-filter-btn');
+
+  if (starFilterActive) {
+    btn.textContent = '★';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '☆';
+    btn.classList.remove('active');
+  }
+
+  const searchQuery = document.getElementById('search').value.trim();
+  if (searchQuery) {
+    await searchTitles();
+  } else {
+    await loadTitles();
+  }
 }
